@@ -26,7 +26,8 @@
   }
 
   // 4) 文案替换：只动文本节点，不碰 DOM 结构与事件
-  var MAP = [['北斗-悦达', '逸品'], ['北斗', '逸品'], ['悦达', '逸品'], ['马奎斯', '祁坤']];
+  var MAP = [['北斗-悦达', '逸品'], ['北斗 · 悦达', '逸品'], ['悦 达', '逸 品'], ['北 斗', '逸 品'],
+             ['悦达', '逸品'], ['北斗', '逸品'], ['马奎斯', '祁坤']];
   function fixText(root) {
     var w = document.createTreeWalker(root || document.body, NodeFilter.SHOW_TEXT, null);
     var n, list = [];
@@ -41,15 +42,30 @@
     }
   }
 
+  function dedupBrand() {
+    var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null), n;
+    while ((n = w.nextNode())) {
+      var v = n.nodeValue;
+      if (/逸品\s*[·・]\s*逸品/.test(v)) n.nodeValue = v.replace(/逸品\s*[·・]\s*逸品/g, '逸品');
+    }
+  }
+
   function apply() {
     fixSel();
     try { if (typeof switchMonth === 'function') switchMonth('8月'); } catch (e) { console.error('[逸品补丁] switchMonth 失败', e); }
     fixText();
+    dedupBrand();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(apply, 60); });
   else setTimeout(apply, 60);
   // 页面内切月/重渲染后再刷一次文案
-  document.addEventListener('click', function () { setTimeout(fixText, 120); }, true);
-  document.addEventListener('change', function () { setTimeout(fixText, 120); }, true);
+  function refresh() { fixText(); dedupBrand(); }
+  [200, 600, 1200, 2500].forEach(function (t) { setTimeout(refresh, t); });
+  try {
+    var mo = new MutationObserver(function () { clearTimeout(window.__yipinT); window.__yipinT = setTimeout(refresh, 80); });
+    mo.observe(document.body, { childList: true, subtree: true });
+  } catch (e) {}
+  document.addEventListener('click', function () { setTimeout(refresh, 120); }, true);
+  document.addEventListener('change', function () { setTimeout(refresh, 120); }, true);
 })();
