@@ -95,6 +95,27 @@ if '</body>' in h:
     h = h.replace('</body>', _fix + '</body>', 1)
     report.append('内联充值/商务收款修正脚本')
 
+# 每日明细的产品下拉：只列该月 dailyData 里真实有逐日数据的项，避免选了空白
+_dk = {m: list((cfg.get('dailyData') or {}).keys()) for m, cfg in d.items()}
+_fix2 = ("\n<script>\n/* 每日明细：产品下拉按该月实际有逐日数据的项来填 */\n"
+         "(function(){var DK=" + json.dumps(_dk, ensure_ascii=False, separators=(',', ':')) + ";\n"
+         "function sync(){var ms=document.getElementById('monthSelector')||document.querySelector('select');\n"
+         "var m=(ms&&ms.value)||Object.keys(DK)[0];var keys=DK[m]||[];\n"
+         "var ps=document.getElementById('daily3ProductSelect');if(!ps||!keys.length)return;\n"
+         "var cur=ps.value;var have=Array.prototype.map.call(ps.options,function(o){return o.value;});\n"
+         "if(have.length===keys.length&&keys.every(function(k,i){return have[i]===k;}))return;\n"
+         "ps.innerHTML=keys.map(function(k){return '<option value=\"'+k+'\">'+k+'</option>';}).join('');\n"
+         "ps.value=keys.indexOf(cur)>=0?cur:keys[0];\n"
+         "ps.dispatchEvent(new Event('change',{bubbles:true}));}\n"
+         "function burst2(){[80,300,700,1400].forEach(function(t){setTimeout(sync,t);});}\n"
+         "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',burst2);else burst2();\n"
+         "document.addEventListener('change',function(e){if(e.target&&e.target.id==='daily3ProductSelect')return;burst2();},true);\n"
+         "document.addEventListener('click',burst2,true);\n})();\n</script>\n")
+if '</body>' in h:
+    h = h.replace('</body>', _fix2 + '</body>', 1)
+    report.append('内联每日明细产品下拉同步脚本')
+
+
 # ── 5b) 数据对比页：默认区间锁到已有月份，并限制可选范围 ──
 def _bounds(dd):
     ds = []
