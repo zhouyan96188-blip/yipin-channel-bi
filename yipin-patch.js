@@ -11,10 +11,15 @@
     Object.keys(d).forEach(function (k) { monthConfigs[k] = d[k]; });
   } catch (e) { console.error('[逸品补丁] monthConfigs 替换失败', e); }
 
-  // 2) 订单流水清空（逸品订单明细未接入，避免残留模板数据）
-  try { if (typeof orders !== 'undefined' && orders.length) orders.length = 0; } catch (e) {}
-  try { if (typeof ordersJun !== 'undefined' && ordersJun.length) ordersJun.length = 0; } catch (e) {}
-  try { if (typeof ordersJul !== 'undefined' && ordersJul.length) ordersJul.length = 0; } catch (e) {}
+  // 2) 订单流水：清掉模板自带的北斗订单，换成逸品的
+  function loadOrders(m) {
+    var arr = (d[m] || {}).orders || [];
+    try { if (typeof orders !== 'undefined') { orders.length = 0; arr.forEach(function (r) { orders.push(r.slice()); }); } } catch (e) {}
+    try { if (typeof ordersJun !== 'undefined') ordersJun.length = 0; } catch (e) {}
+    try { if (typeof ordersJul !== 'undefined') ordersJul.length = 0; } catch (e) {}
+    try { Object.keys(d).forEach(function (k) { if (monthConfigs[k]) monthConfigs[k].orders = (d[k].orders || []).map(function (r) { return r.slice(); }); }); } catch (e) {}
+  }
+  loadOrders('8月');
 
   // 3) 月份下拉改成 8月 / 7月
   function fixSel() {
@@ -52,6 +57,8 @@
 
   function apply() {
     fixSel();
+    var _s0 = document.getElementById('monthSelector') || document.querySelector('select');
+    loadOrders((_s0 && _s0.value) || '8月');
     try { if (typeof switchMonth === 'function') switchMonth('8月'); } catch (e) { console.error('[逸品补丁] switchMonth 失败', e); }
     fixText();
     dedupBrand();
@@ -98,10 +105,10 @@
     var hot = P.filter(function (p) { return p.budget > 0; }).sort(function (a, b) { return b.consumeRate - a.consumeRate; }).slice(0, 5);
     var pe = c.personalData.people.slice().sort(function (a, b) { return (b.expense / (b.actual || 1)) - (a.expense / (a.actual || 1)); });
     var hi = pe[0];
-    var L = function (t) { return '<div style="margin:6px 0;line-height:1.9;font-size:13px">' + t + '</div>'; };
+    var L = function (t) { return '<div style="margin:5px 0;line-height:1.85;font-size:13px;color:#5a6478">' + t + '</div>'; };
     var CARD = function (t, body) { return '<div class="card"><h3>' + t + '</h3>' + body + '</div>'; };
     var partial = m === '8月';
-    pg.innerHTML =
+    pg.innerHTML = '<div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">' +
       CARD('📌 一、目标达成总结',
         L('<b>' + (partial ? '本月截至 08-03（3/31 天，时间进度 ' + tp + '%）' : '7 月完整月') + '</b>，累计新增 <b>' + N(act) + '</b>，完成率 <b>' + comp.toFixed(2) + '%</b>' +
           (partial ? '，与时间进度 ' + tp + '% 基本同步。' : '，全月未达成 100% 目标。')) +
@@ -119,7 +126,7 @@
         L(partial
           ? '⚠️ 8 月结算严重滞后：结算表 59 行订单只有 8 笔填了请款日期，已打款 40,000 元，仅占 BI 消耗的 4.0%。月初属正常，月中需跟进兑付节奏。'
           : '7 月已结清，打款 9,241,414 元，占 BI 消耗 72.8%；差额来自 CPT 包月与跨月结转。')) +
-      '<div class="card" style="border-left:3px solid var(--gold,#c9a84c)"><div style="font-size:12px;color:#8a93a6;line-height:1.8">数据来源：预算表「' + m + '」sheet（目标/预算/负责人）· BI 产品汇总（新增/消耗/充值）· 渠道结算明细-' + m + '（打款）· 商务月度目标。<br>口径：「实际消耗」为 BI 投放消耗，非打款口径；两个月同口径可比。</div></div>';
+      '</div><div class="card" style="margin-top:16px;border-left:3px solid var(--gold,#c9a84c)"><div style="font-size:12px;color:#8a93a6;line-height:1.8">数据来源：预算表「' + m + '」sheet（目标/预算/负责人）· BI 产品汇总（新增/消耗/充值）· 渠道结算明细-' + m + '（打款）· 商务月度目标。<br>口径：「实际消耗」为 BI 投放消耗，非打款口径；两个月同口径可比。</div></div>';
     pg.setAttribute('data-yipin', m);
   }
 
@@ -129,7 +136,8 @@
     var mo = new MutationObserver(function () { clearTimeout(window.__yipinT); window.__yipinT = setTimeout(refresh, 80); });
     mo.observe(document.body, { childList: true, subtree: true });
   } catch (e) {}
-  function refreshBurst() { var pg=document.getElementById('page-review'); if(pg) pg.removeAttribute('data-yipin'); [60, 200, 500, 1000].forEach(function (t) { setTimeout(refresh, t); }); }
+  function refreshBurst() { var pg=document.getElementById('page-review'); if(pg) pg.removeAttribute('data-yipin');
+    var _s=document.getElementById('monthSelector')||document.querySelector('select'); loadOrders((_s&&_s.value)||'8月'); [60, 200, 500, 1000].forEach(function (t) { setTimeout(refresh, t); }); }
   document.addEventListener('click', refreshBurst, true);
   document.addEventListener('change', refreshBurst, true);
   // 模板的 switchMonth 会重渲染整页，包一层确保之后补刷
