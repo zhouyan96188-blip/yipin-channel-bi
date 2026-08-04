@@ -119,11 +119,25 @@ if n_url:
     report.append('切断北斗云端同步 URL ×%d（投放策略改为本地填写，不再拉别人的数据）' % n_url)
 
 # 清掉模板内嵌的策略默认文案（北斗产品名）
-for pat in (r"(STRAT_L\s*=\s*)(\{[^;]*\}|\[[^;]*\])", ):
-    m2 = re.search(pat, h)
+for _v in ('STRAT_L', 'STRAT_DEFAULT', 'DEFAULT_STRATEGY', 'STRATEGY_TEXT'):
+    m2 = re.search(r'(?:const|let|var)\s+' + _v + r'\s*=\s*', h)
     if m2:
-        h = h[:m2.start(2)] + '{}' + h[m2.end(2):]
-        report.append('清空模板内置策略文案 STRAT_L')
+        e2 = h.find(';', m2.end())
+        if e2 > 0:
+            h = h[:m2.end()] + '{}' + h[e2:]
+            report.append('清空模板内置策略文案 ' + _v)
+
+# 兜底：任何仍含北斗产品名的字符串字面量整体清空（策略/备注类默认文案）
+BEIDOU_WORDS = ('51tiktok', '51推特', '51成人', '51动漫', '51品茶', '禁漫天堂', '萝莉岛',
+                '海角乱伦', '暗网禁区', '抖阴Max', '91Pron', '91鬼父', '草榴社区', '妻友',
+                'AI色色', 'pornhub免费版', '91成人盒子', '蓝友')
+def _blank_lit(mo):
+    q, body = mo.group(1), mo.group(2)
+    return q + q if any(w in body for w in BEIDOU_WORDS) else mo.group(0)
+before = h
+h = re.sub(r'(["\'])((?:[^"\'\\]|\\.){0,400}?)\1', _blank_lit, h)
+if h != before:
+    report.append('清空含北斗产品名的默认文案字符串')
 
 # ── 6) 拆掉运行时补丁引用（不再寄生）────────────────────
 for tag in ('<script src="yipin-patch.js"></script>', "<script src='yipin-patch.js'></script>"):
