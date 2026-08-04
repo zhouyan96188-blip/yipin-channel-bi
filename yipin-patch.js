@@ -69,7 +69,7 @@
     if (!e) return;
     var M2 = function (n) { return (n / 1e6).toFixed(2) + 'M'; };
     var NUM = function (n) { return Number(n).toLocaleString('en-US'); };
-    var set = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    var set = function (id, v) { var el = document.getElementById(id); if (el && el.textContent !== v) el.textContent = v; };
     set('ovRechargeTotal', e.recharge >= 1e6 ? M2(e.recharge) : NUM(e.recharge));
     set('ovRechargeDesc', 'BI 充值合计 · 未设月度目标');
     set('ovCollectTotal', M2(e.biz));
@@ -82,6 +82,14 @@
     var mo = new MutationObserver(function () { clearTimeout(window.__yipinT); window.__yipinT = setTimeout(refresh, 80); });
     mo.observe(document.body, { childList: true, subtree: true });
   } catch (e) {}
-  document.addEventListener('click', function () { setTimeout(refresh, 120); }, true);
-  document.addEventListener('change', function () { setTimeout(refresh, 120); }, true);
+  function refreshBurst() { [60, 200, 500, 1000].forEach(function (t) { setTimeout(refresh, t); }); }
+  document.addEventListener('click', refreshBurst, true);
+  document.addEventListener('change', refreshBurst, true);
+  // 模板的 switchMonth 会重渲染整页，包一层确保之后补刷
+  try {
+    if (typeof switchMonth === 'function') {
+      var _sm = switchMonth;
+      window.switchMonth = function () { var r = _sm.apply(this, arguments); refreshBurst(); return r; };
+    }
+  } catch (e) {}
 })();
