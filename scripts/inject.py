@@ -219,6 +219,24 @@ _ls = """<script>
 h = h.replace('</body>', _ls + '</body>', 1)
 report.append('\u5df2\u52a0 localStorage \u6b8b\u7559\u6e05\u7406\u811a\u672c')
 
+# ── 5f) 清掉 review 页以外的零星模板残留（都不影响显示，但不留人家的字）──
+#     ① 三个 KPI 卡片的静态占位文本：运行时会被真实产品名覆盖，源码里却写死着北斗产品
+_kpi_n = 0
+for _kid in ('kpiMaxRateName', 'kpiMinRateName', 'kpiMaxConsumeName'):
+    _pat = r'(id="' + _kid + r'"[^>]*>)[^<]*'
+    h, _c = re.subn(_pat, r'\g<1>\u2014', h)
+    _kpi_n += _c
+if _kpi_n < 3:
+    die('KPI 占位符替换数不足（只换到 %d/3），模板结构可能变了' % _kpi_n)
+
+#     ② 代码注释里的示例产品名（// 示例：const productWhitelist = [...]）
+_cm_i = h.find('// \u793a\u4f8b\uff1aconst productWhitelist')
+if _cm_i >= 0:
+    _cm_j = h.find('\n', _cm_i)
+    if _cm_j < 0: die('注释行结尾定位失败')
+    h = h[:_cm_i] + "// \u793a\u4f8b\uff1aconst productWhitelist = ['\u4ea7\u54c1A','\u4ea7\u54c1B'];" + h[_cm_j:]
+report.append('\u5df2\u6e05 KPI \u5360\u4f4d\u7b26 %d \u5904 + \u6ce8\u91ca\u793a\u4f8b' % _kpi_n)
+
 # ── 6) 拆掉运行时补丁引用（不再寄生）────────────────────
 for tag in ('<script src="yipin-patch.js"></script>', "<script src='yipin-patch.js'></script>"):
     if tag in h: h = h.replace(tag, ''); report.append('移除 yipin-patch.js 引用')
