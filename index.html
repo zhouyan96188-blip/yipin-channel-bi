@@ -346,7 +346,7 @@ tbody td:not(:first-child) { text-align:right; font-family:'JetBrains Mono','SF 
   </div>
   <div class="sidebar-footer">
     <div class="sf-date">更新时间</div>
-    <div class="sf-period" id="sidebarUpdateTime">2026-08-04 17:36</div>
+    <div class="sf-period" id="sidebarUpdateTime">2026-08-04 17:46</div>
   </div>
 </nav>
 
@@ -2117,7 +2117,7 @@ function refreshKPIs() {
   document.getElementById('ovBudgetSplit').textContent = `付费${M(paidBudget)} · 免费${M(freeBudget)}`;
 
   // 产品充值：用户提供的固定值（按月）。目前仅 7 月有数，其它月份留空。
-  const PROD_RECHARGE = {"8月":{"value":50918,"target":0},"7月":{"value":792700,"target":0}};
+  const PROD_RECHARGE = {"8月":50918,"7月":792700};
   const _pr = PROD_RECHARGE[currentMonth];
   if (_pr) {
     document.getElementById('ovRechargeTotal').textContent = M(_pr.collect);
@@ -2127,7 +2127,7 @@ function refreshKPIs() {
     document.getElementById('ovRechargeDesc').textContent = '待接入数据源';
   }
   // 商务收款：用户提供的固定值（按月）。目前仅 7 月有数，其它月份留空。
-  const BIZ_COLLECT = {"8月":{"value":1750000,"target":21000000},"7月":{"value":18330000,"target":21500000}};
+  const BIZ_COLLECT = {"8月":1750000,"7月":18330000};
   const _biz = BIZ_COLLECT[currentMonth];
   if (_biz) {
     document.getElementById('ovCollectTotal').textContent = M(_biz.collect);
@@ -3063,6 +3063,24 @@ refreshKPIs();
 renderOverview();
 cloudLoad();
 if (syncEnabled()) setInterval(cloudLoad, 30000);
+</script>
+
+<script>
+/* 逸品数据注入：产品充值 / 商务收款两张卡（模板常量结构与本项目不同，这里按月直接写值）*/
+(function(){var K={"8月":{"recharge":50918,"rechargeTarget":0,"biz":1750000,"bizTarget":21000000},"7月":{"recharge":792700,"rechargeTarget":0,"biz":18330000,"bizTarget":21500000}};
+function M2(n){return (n/1e6).toFixed(2)+'M';}
+function NUM(n){return Number(n).toLocaleString('en-US');}
+function set(id,v){var e=document.getElementById(id);if(e&&e.textContent!==v)e.textContent=v;}
+function fix(){var s=document.getElementById('monthSelector')||document.querySelector('select');
+var m=(s&&s.value)||Object.keys(K)[0];var e=K[m];if(!e)return;
+set('ovRechargeTotal', e.recharge>=1e6?M2(e.recharge):NUM(e.recharge));
+set('ovRechargeDesc','BI 充值合计 · 未设月度目标');
+set('ovCollectTotal', M2(e.biz));
+set('ovCollectDesc','目标'+M2(e.bizTarget)+' · 达成'+(e.biz/e.bizTarget*100).toFixed(1)+'%');}
+function burst(){[60,250,600,1200].forEach(function(t){setTimeout(fix,t);});}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',burst);else burst();
+document.addEventListener('change',burst,true);document.addEventListener('click',burst,true);
+})();
 </script>
 </body>
 </html>

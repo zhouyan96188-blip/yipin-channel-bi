@@ -65,19 +65,35 @@ for a, b in [('北斗-悦达', '逸品'), ('北斗 · 悦达', '逸品'), ('悦 
     n = h.count(a)
     if n: h = h.replace(a, b); report.append('文案 %s→%s ×%d' % (a, b, n))
 
-# ── 5) 充值 / 商务收款两个硬编码常量 ─────────────────────
+# ── 5) 充值 / 商务收款：常量换成「月→数字」，另在页面末尾内联一段修正脚本兜底 ──
 for var, key in (('PROD_RECHARGE', 'recharge'), ('BIZ_COLLECT', 'biz')):
-    p = h.find('const ' + var)
-    if p < 0: p = h.find('var ' + var)
-    if p < 0: continue
-    e = h.find(';', p)
-    obj = {}
-    for m, cfg in d.items():
-        ex = cfg.get('kpiExtra') or {}
-        obj[m] = {'value': ex.get(key, 0), 'target': ex.get(key + 'Target', 0) if key == 'recharge' else ex.get('bizTarget', 0)}
-    decl = h[p:h.find(var, p) + len(var)]
-    h = h[:p] + decl + ' = ' + json.dumps(obj, ensure_ascii=False, separators=(',', ':')) + h[e:]
-    report.append(var + ' → 逸品按月值')
+    m3 = re.search(r'(?:const|let|var)\s+' + var + r'\s*=\s*', h)
+    if not m3:
+        continue
+    e3 = h.find(';', m3.end())
+    obj = {m: (cfg.get('kpiExtra') or {}).get(key, 0) for m, cfg in d.items()}
+    h = h[:m3.end()] + json.dumps(obj, ensure_ascii=False, separators=(',', ':')) + h[e3:]
+    report.append(var + ' → ' + json.dumps(obj, ensure_ascii=False))
+
+_kpi = {m: (cfg.get('kpiExtra') or {}) for m, cfg in d.items()}
+_fix = ("\n<script>\n/* 逸品数据注入：产品充值 / 商务收款两张卡（模板常量结构与本项目不同，这里按月直接写值）*/\n"
+        "(function(){var K=" + json.dumps(_kpi, ensure_ascii=False, separators=(',', ':')) + ";\n"
+        "function M2(n){return (n/1e6).toFixed(2)+'M';}\n"
+        "function NUM(n){return Number(n).toLocaleString('en-US');}\n"
+        "function set(id,v){var e=document.getElementById(id);if(e&&e.textContent!==v)e.textContent=v;}\n"
+        "function fix(){var s=document.getElementById('monthSelector')||document.querySelector('select');\n"
+        "var m=(s&&s.value)||Object.keys(K)[0];var e=K[m];if(!e)return;\n"
+        "set('ovRechargeTotal', e.recharge>=1e6?M2(e.recharge):NUM(e.recharge));\n"
+        "set('ovRechargeDesc','BI 充值合计 · 未设月度目标');\n"
+        "set('ovCollectTotal', M2(e.biz));\n"
+        "set('ovCollectDesc','目标'+M2(e.bizTarget)+' · 达成'+(e.biz/e.bizTarget*100).toFixed(1)+'%');}\n"
+        "function burst(){[60,250,600,1200].forEach(function(t){setTimeout(fix,t);});}\n"
+        "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',burst);else burst();\n"
+        "document.addEventListener('change',burst,true);document.addEventListener('click',burst,true);\n"
+        "})();\n</script>\n")
+if '</body>' in h:
+    h = h.replace('</body>', _fix + '</body>', 1)
+    report.append('内联充值/商务收款修正脚本')
 
 # ── 5b) 数据对比页：默认区间锁到已有月份，并限制可选范围 ──
 def _bounds(dd):
