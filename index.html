@@ -346,7 +346,7 @@ tbody td:not(:first-child) { text-align:right; font-family:'JetBrains Mono','SF 
   </div>
   <div class="sidebar-footer">
     <div class="sf-date">更新时间</div>
-    <div class="sf-period" id="sidebarUpdateTime">2026-08-04 19:14</div>
+    <div class="sf-period" id="sidebarUpdateTime">2026-08-04 19:18</div>
   </div>
 </nav>
 
@@ -2979,14 +2979,29 @@ document.addEventListener('click',burst2,true);
 </script>
 <script>
 (function(){
+  var BAD=/51tiktok|51动漫|91Pron|禁漫天堂|萝莉岛|51品茶|51推特|Pornhub中文版|TikTok成人版|金予|赵尘|李漫妮|温夏青|马奎斯/;
+  function wipe(){
+    try{
+      ['bi_strategy_note','bi_strategy_notes','bi_strategy_overrides'].forEach(function(k){
+        var v=localStorage.getItem(k);
+        if(v && BAD.test(v)) localStorage.removeItem(k);
+      });
+      var ta=document.getElementById('strategyNote');
+      if(ta && BAD.test(ta.value||'')) ta.value='';
+    }catch(e){}
+  }
+  wipe();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', wipe);
+  else wipe();
+  window.addEventListener('load', wipe);
+  setTimeout(wipe, 600); setTimeout(wipe, 2000);
+  // 兜底：拦住把北斗文案写回去的调用
   try{
-    var BAD=/51tiktok|51动漫|91Pron|禁漫天堂|萝莉岛|51品茶|51推特|Pornhub中文版|TikTok成人版|金予|赵尘|李漫妮|温夏青|马奎斯/;
-    ['bi_strategy_note','bi_strategy_notes','bi_strategy_overrides'].forEach(function(k){
-      var v=localStorage.getItem(k);
-      if(v && BAD.test(v)) localStorage.removeItem(k);
-    });
-    var ta=document.getElementById('strategyNote');
-    if(ta && BAD.test(ta.value||'')) ta.value='';
+    var _si = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = function(k,v){
+      if(typeof v==='string' && BAD.test(v)) return;
+      return _si(k,v);
+    };
   }catch(e){}
 })();
 </script>
