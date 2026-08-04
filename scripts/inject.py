@@ -224,7 +224,7 @@ report.append('\u5df2\u52a0 localStorage \u6b8b\u7559\u6e05\u7406\u811a\u672c')
 _kpi_n = 0
 for _kid in ('kpiMaxRateName', 'kpiMinRateName', 'kpiMaxConsumeName'):
     _pat = r'(id="' + _kid + r'"[^>]*>)[^<]*'
-    h, _c = re.subn(_pat, r'\g<1>\u2014', h)
+    h, _c = re.subn(_pat, lambda m: m.group(1) + '—', h)
     _kpi_n += _c
 if _kpi_n < 3:
     die('KPI 占位符替换数不足（只换到 %d/3），模板结构可能变了' % _kpi_n)
