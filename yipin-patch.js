@@ -56,6 +56,7 @@
     fixText();
     dedupBrand();
     fixKpiCards();
+    fixReview();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(apply, 60); });
@@ -76,13 +77,59 @@
     set('ovCollectDesc', '目标' + M2(e.bizTarget) + ' · 达成' + (e.biz / e.bizTarget * 100).toFixed(1) + '%');
   }
 
-  function refresh() { fixText(); dedupBrand(); fixKpiCards(); }
+
+  // 6) 月度复盘页：模板里是北斗手写的复盘文字（硬编码），按逸品数据重写
+  function fixReview() {
+    var pg = document.getElementById('page-review');
+    if (!pg) return;
+    var sel = document.getElementById('monthSelector') || document.querySelector('select');
+    var m = (sel && sel.value) || '8月';
+    var c = d[m]; if (!c) return;
+    if (pg.getAttribute('data-yipin') === m) return;
+    var P = c.products, e = c.kpiExtra || {};
+    var N = function (n, f) { return Number(n).toLocaleString('en-US', { minimumFractionDigits: f || 0, maximumFractionDigits: f || 0 }); };
+    var M2 = function (n) { return (n / 1e6).toFixed(2) + 'M'; };
+    var tgt = 0, act = 0, bgt = 0, csm = 0;
+    P.forEach(function (p) { tgt += p.target; act += p.total; bgt += p.budget; csm += p.consume; });
+    var days = m === '8月' ? 3 : 31, tp = +(days / 31 * 100).toFixed(2);
+    var comp = act / tgt * 100, cons = csm / bgt * 100, cpa = csm / act;
+    var top = P.slice().sort(function (a, b) { return b.completion - a.completion; }).slice(0, 5);
+    var low = P.slice().sort(function (a, b) { return a.completion - b.completion; }).slice(0, 3);
+    var hot = P.filter(function (p) { return p.budget > 0; }).sort(function (a, b) { return b.consumeRate - a.consumeRate; }).slice(0, 5);
+    var pe = c.personalData.people.slice().sort(function (a, b) { return (b.expense / (b.actual || 1)) - (a.expense / (a.actual || 1)); });
+    var hi = pe[0];
+    var L = function (t) { return '<div style="margin:6px 0;line-height:1.9;font-size:13px">' + t + '</div>'; };
+    var CARD = function (t, body) { return '<div class="card"><h3>' + t + '</h3>' + body + '</div>'; };
+    var partial = m === '8月';
+    pg.innerHTML =
+      CARD('📌 一、目标达成总结',
+        L('<b>' + (partial ? '本月截至 08-03（3/31 天，时间进度 ' + tp + '%）' : '7 月完整月') + '</b>，累计新增 <b>' + N(act) + '</b>，完成率 <b>' + comp.toFixed(2) + '%</b>' +
+          (partial ? '，与时间进度 ' + tp + '% 基本同步。' : '，全月未达成 100% 目标。')) +
+        L('<b>完成率前五</b>：' + top.map(function (p) { return p.name + ' ' + p.completion + '%'; }).join('、')) +
+        L('<b>完成率垫底</b>：' + low.map(function (p) { return p.name + ' ' + p.completion + '%'; }).join('、') + '（性欲社预算为 0，本就无投放计划）')) +
+      CARD('💰 二、预算与消耗',
+        L('BI 投放消耗 <b>' + N(csm) + '</b> / 预算 ' + N(bgt) + '，消耗率 <b>' + cons.toFixed(2) + '%</b>' + (cons > 100 ? '（<span style="color:#f25c7a">已超预算</span>，BI 口径含 CPT 包月与结转，高于打款口径）' : '')) +
+        L('平均 CPA <b>' + cpa.toFixed(2) + '</b>，产品充值 ' + N(e.recharge || 0) + '，充值 ROI ' + (csm ? ((e.recharge || 0) / csm).toFixed(3) : '—')) +
+        L('<b>消耗率最高</b>：' + hot.map(function (p) { return p.name + ' ' + p.consumeRate + '%'; }).join('、'))) +
+      CARD('👤 三、人员表现',
+        L('<b>' + hi.name + ' CPA 最高</b>：消耗 ' + N(hi.expense) + '、新增 ' + N(hi.actual) + '，单位成本 ' + (hi.expense / (hi.actual || 1)).toFixed(2) + '，为团队均值 ' + cpa.toFixed(2) + ' 的 ' + ((hi.expense / (hi.actual || 1)) / cpa).toFixed(1) + ' 倍，建议优先排查。') +
+        L(c.personalData.people.map(function (x) { return x.name + ' ' + x.completion + '%'; }).join(' &nbsp;·&nbsp; '))) +
+      CARD('🧾 四、商务与结算',
+        L('商务收款 <b>' + M2(e.biz || 0) + '</b> / 目标 ' + M2(e.bizTarget || 0) + '，达成 <b>' + ((e.biz || 0) / (e.bizTarget || 1) * 100).toFixed(2) + '%</b>') +
+        L(partial
+          ? '⚠️ 8 月结算严重滞后：结算表 59 行订单只有 8 笔填了请款日期，已打款 40,000 元，仅占 BI 消耗的 4.0%。月初属正常，月中需跟进兑付节奏。'
+          : '7 月已结清，打款 9,241,414 元，占 BI 消耗 72.8%；差额来自 CPT 包月与跨月结转。')) +
+      '<div class="card" style="border-left:3px solid var(--gold,#c9a84c)"><div style="font-size:12px;color:#8a93a6;line-height:1.8">数据来源：预算表「' + m + '」sheet（目标/预算/负责人）· BI 产品汇总（新增/消耗/充值）· 渠道结算明细-' + m + '（打款）· 商务月度目标。<br>口径：「实际消耗」为 BI 投放消耗，非打款口径；两个月同口径可比。</div></div>';
+    pg.setAttribute('data-yipin', m);
+  }
+
+  function refresh() { fixText(); dedupBrand(); fixKpiCards(); fixReview(); }
   [200, 600, 1200, 2500].forEach(function (t) { setTimeout(refresh, t); });
   try {
     var mo = new MutationObserver(function () { clearTimeout(window.__yipinT); window.__yipinT = setTimeout(refresh, 80); });
     mo.observe(document.body, { childList: true, subtree: true });
   } catch (e) {}
-  function refreshBurst() { [60, 200, 500, 1000].forEach(function (t) { setTimeout(refresh, t); }); }
+  function refreshBurst() { var pg=document.getElementById('page-review'); if(pg) pg.removeAttribute('data-yipin'); [60, 200, 500, 1000].forEach(function (t) { setTimeout(refresh, t); }); }
   document.addEventListener('click', refreshBurst, true);
   document.addEventListener('change', refreshBurst, true);
   // 模板的 switchMonth 会重渲染整页，包一层确保之后补刷
