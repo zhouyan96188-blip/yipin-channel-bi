@@ -55,12 +55,28 @@
     try { if (typeof switchMonth === 'function') switchMonth('8月'); } catch (e) { console.error('[逸品补丁] switchMonth 失败', e); }
     fixText();
     dedupBrand();
+    fixKpiCards();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(apply, 60); });
   else setTimeout(apply, 60);
   // 页面内切月/重渲染后再刷一次文案
-  function refresh() { fixText(); dedupBrand(); }
+  // 5) 覆盖模板硬编码的「产品充值 / 商务收款」两张卡（模板里是北斗的常量，闭包内改不到，直接改 DOM）
+  function fixKpiCards() {
+    var sel = document.getElementById('monthSelector') || document.querySelector('select');
+    var m = (sel && sel.value) || '8月';
+    var e = (d[m] || {}).kpiExtra;
+    if (!e) return;
+    var M2 = function (n) { return (n / 1e6).toFixed(2) + 'M'; };
+    var NUM = function (n) { return Number(n).toLocaleString('en-US'); };
+    var set = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+    set('ovRechargeTotal', e.recharge >= 1e6 ? M2(e.recharge) : NUM(e.recharge));
+    set('ovRechargeDesc', 'BI 充值合计 · 未设月度目标');
+    set('ovCollectTotal', M2(e.biz));
+    set('ovCollectDesc', '目标' + M2(e.bizTarget) + ' · 达成' + (e.biz / e.bizTarget * 100).toFixed(1) + '%');
+  }
+
+  function refresh() { fixText(); dedupBrand(); fixKpiCards(); }
   [200, 600, 1200, 2500].forEach(function (t) { setTimeout(refresh, t); });
   try {
     var mo = new MutationObserver(function () { clearTimeout(window.__yipinT); window.__yipinT = setTimeout(refresh, 80); });
