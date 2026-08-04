@@ -179,26 +179,97 @@ h = re.sub(r'(=\s*)(["\'])((?:[^"\'\\\n]|\\.){1,300}?)\2', _blank_assign, h)
 if h != before:
     report.append('清空含北斗产品名的默认文案（仅赋值语句）')
 
-# ── 5d) 月度复盘页：整块换成空态（模板里是北斗5月的人工文案，不许照抄）──
+# ── 5d) 月度复盘页：用 yipin_data.json 里的 review 数据渲染（模板自带的是北斗5月人工文案，不许照抄）──
 _rv_i = h.find('<div class="page" id="page-review">')
 _rv_j = h.find('</div><!-- /main -->')
 if _rv_i < 0 or _rv_j < 0 or _rv_j <= _rv_i:
     die('page-review 定位失败（i=%d j=%d）' % (_rv_i, _rv_j))
+
+_reviews = {}
+for _m, _cfg in mc.items():
+    if isinstance(_cfg, dict) and _cfg.get('review'):
+        _reviews[_m] = _cfg['review']
+if not _reviews:
+    die('yipin_data.json 里没有任何月份的 review 数据')
+
 _rv_new = (
  '<div class="page" id="page-review">\n'
  '  <div class="section-title">\u6708\u5ea6\u590d\u76d8</div>\n'
- '  <div class="section-sub">\u9038\u54c1 | <span id="reviewMonthLabel">2026\u5e747\u6708</span> \u6708\u5ea6\u590d\u76d8\u62a5\u544a</div>\n'
- '  <div class="card" style="padding:64px 24px;text-align:center;">\n'
- '    <div style="font-size:15px;color:var(--text2);font-weight:600;margin-bottom:10px;">\u672c\u6708\u590d\u76d8\u5c1a\u672a\u586b\u5199</div>\n'
- '    <div style="font-size:13px;color:var(--text3);line-height:1.9;">\n'
- '      \u6708\u5ea6\u590d\u76d8\u4e3a\u4eba\u5de5\u64b0\u5199\u5185\u5bb9\uff0c\u9700\u7ed3\u5408\u5f53\u6708\u6295\u653e\u60c5\u51b5\u3001\u9884\u7b97\u6267\u884c\u4e0e\u4eba\u5458\u5206\u5de5\u7531\u4e1a\u52a1\u65b9\u586b\u5199\u3002<br>\n'
- '      \u7cfb\u7edf\u4e0d\u81ea\u52a8\u751f\u6210\uff0c\u4e5f\u4e0d\u6cbf\u7528\u5176\u4ed6\u516c\u53f8\u7684\u6a21\u677f\u5185\u5bb9\u3002\n'
- '    </div>\n'
- '  </div>\n'
+ '  <div class="section-sub" id="reviewSub"></div>\n'
+ '  <div id="reviewBody"></div>\n'
  '</div>\n\n'
 )
 h = h[:_rv_i] + _rv_new + h[_rv_j:]
-report.append('\u6708\u5ea6\u590d\u76d8\u9875\u5df2\u6e05\u7a7a\u4e3a\u7a7a\u6001')
+
+_rv_js = """<script>
+(function(){
+  var RV = __RVDATA__;
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function render(){
+    var m = (typeof currentMonth!=='undefined') ? currentMonth : '';
+    var d = RV[m];
+    var sub = document.getElementById('reviewSub');
+    var body = document.getElementById('reviewBody');
+    if(!sub || !body) return;
+    if(!d){
+      sub.textContent = '\u9038\u54c1\u6e20\u9053 | ' + m + ' \u6708\u5ea6\u590d\u76d8\u62a5\u544a';
+      body.innerHTML = '<div class="card" style="padding:64px 24px;text-align:center;color:var(--text3);font-size:13px;">'
+        + '\u672c\u6708\u6682\u65e0\u590d\u76d8</div>';
+      return;
+    }
+    sub.textContent = d.sub || '';
+    if(d.pending){
+      body.innerHTML = '<div class="card" style="padding:64px 24px;text-align:center;">'
+        + '<div style="font-size:15px;color:var(--text2);font-weight:600;margin-bottom:10px;">\u590d\u76d8\u5c1a\u672a\u751f\u6210</div>'
+        + '<div style="font-size:13px;color:var(--text3);line-height:1.9;">' + esc(d.pending) + '</div></div>';
+      return;
+    }
+    var html = '';
+    if(d.kpi && d.kpi.length){
+      html += '<div class="kpi-grid kpi-grid-4">';
+      d.kpi.forEach(function(k){
+        html += '<div class="kpi-card" style="--kc:var(--'+esc(k.c)+')">'
+             +  '<div class="icon">'+esc(k.icon)+'</div>'
+             +  '<div class="kpi-label">'+esc(k.label)+'</div>'
+             +  '<div class="kpi-val">'+esc(k.val)+'</div>'
+             +  '<div class="kpi-desc">'+esc(k.desc)+'</div></div>';
+      });
+      html += '</div>';
+    }
+    html += '<div class="grid-2"><div>';
+    (d.sections||[]).forEach(function(sec, idx){
+      if(idx === Math.ceil((d.sections.length)/2)) html += '</div><div>';
+      html += '<div class="review-section"><div class="review-header">' + esc(sec.title)
+           + (sec.note ? ' <span style="font-weight:400;color:var(--text3);font-size:11px;margin-left:6px">'+esc(sec.note)+'</span>' : '')
+           + '</div><div class="review-body">';
+      (sec.rows||[]).forEach(function(r){
+        html += '<div class="review-row">'
+             +  (r.icon ? '<div class="review-icon">'+esc(r.icon)+'</div>' : '')
+             +  '<div class="review-content"><h4>'+esc(r.h)+'</h4><p>'+esc(r.p)+'</p></div></div>';
+      });
+      html += '</div></div>';
+    });
+    html += '</div></div>';
+    body.innerHTML = html;
+  }
+  window.__renderReview = render;
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', render);
+  else render();
+  // 切月 / 切页时重渲染
+  ['switchMonth','switchPage'].forEach(function(fn){
+    try{
+      if(typeof window[fn]==='function'){
+        var _o = window[fn];
+        window[fn] = function(){ var r=_o.apply(this, arguments); try{ render(); }catch(e){} return r; };
+      }
+    }catch(e){}
+  });
+  setTimeout(render, 800);
+})();
+</script>
+"""
+_rv_js = _rv_js.replace('__RVDATA__', json.dumps(_reviews, ensure_ascii=False, separators=(',', ':')))
+report.append('\u6708\u5ea6\u590d\u76d8\u9875\u6539\u4e3a\u6570\u636e\u6e32\u67d3\uff08%d \u4e2a\u6708\u4efd\uff09' % len(_reviews))
 
 # ── 5e) 清掉浏览器 localStorage 里残留的北斗策略文案 ──
 #     这些不在代码里，是访问时写进用户浏览器的，改代码清不掉，必须在页面上清
@@ -233,7 +304,7 @@ _ls = """<script>
 """
 _be = h.rfind('</body>')
 if _be < 0: die('找不到 </body>')
-h = h[:_be] + _ls + h[_be:]
+h = h[:_be] + _rv_js + _ls + h[_be:]
 report.append('\u5df2\u52a0 localStorage \u6b8b\u7559\u6e05\u7406\u811a\u672c')
 
 # ── 5f) 清掉 review 页以外的零星模板残留（都不影响显示，但不留人家的字）──
@@ -268,7 +339,7 @@ for must in ('</html>', '</body>', 'monthConfigs', 'switchMonth',
              'kpiMinRate', 'kpiMaxRate', 'ovTargetTotal', 'ovBudgetTotal', 'monthSelector'):
     if must not in h: die('注入后缺少关键片段: ' + must)
 # 残留检查一律排除 5e 的清理脚本本身（它的正则里必然含这些词）
-_h_check = h.replace(_ls, '')
+_h_check = h.replace(_ls, '').replace(_rv_js, '')
 for bad in ('悦达', '北斗', '马奎斯'):
     if bad in _h_check: die('注入后仍残留「%s」，请检查替换规则' % bad)
 for bad in ('51tiktok', '51动漫', '91Pron', '禁漫天堂', '萝莉岛', '51品茶',
