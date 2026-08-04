@@ -179,6 +179,46 @@ h = re.sub(r'(=\s*)(["\'])((?:[^"\'\\\n]|\\.){1,300}?)\2', _blank_assign, h)
 if h != before:
     report.append('清空含北斗产品名的默认文案（仅赋值语句）')
 
+# ── 5d) 月度复盘页：整块换成空态（模板里是北斗5月的人工文案，不许照抄）──
+_rv_i = h.find('<div class="page" id="page-review">')
+_rv_j = h.find('</div><!-- /main -->')
+if _rv_i < 0 or _rv_j < 0 or _rv_j <= _rv_i:
+    die('page-review 定位失败（i=%d j=%d）' % (_rv_i, _rv_j))
+_rv_new = (
+ '<div class="page" id="page-review">\n'
+ '  <div class="section-title">\u6708\u5ea6\u590d\u76d8</div>\n'
+ '  <div class="section-sub">\u9038\u54c1 | <span id="reviewMonthLabel">2026\u5e747\u6708</span> \u6708\u5ea6\u590d\u76d8\u62a5\u544a</div>\n'
+ '  <div class="card" style="padding:64px 24px;text-align:center;">\n'
+ '    <div style="font-size:15px;color:var(--text2);font-weight:600;margin-bottom:10px;">\u672c\u6708\u590d\u76d8\u5c1a\u672a\u586b\u5199</div>\n'
+ '    <div style="font-size:13px;color:var(--text3);line-height:1.9;">\n'
+ '      \u6708\u5ea6\u590d\u76d8\u4e3a\u4eba\u5de5\u64b0\u5199\u5185\u5bb9\uff0c\u9700\u7ed3\u5408\u5f53\u6708\u6295\u653e\u60c5\u51b5\u3001\u9884\u7b97\u6267\u884c\u4e0e\u4eba\u5458\u5206\u5de5\u7531\u4e1a\u52a1\u65b9\u586b\u5199\u3002<br>\n'
+ '      \u7cfb\u7edf\u4e0d\u81ea\u52a8\u751f\u6210\uff0c\u4e5f\u4e0d\u6cbf\u7528\u5176\u4ed6\u516c\u53f8\u7684\u6a21\u677f\u5185\u5bb9\u3002\n'
+ '    </div>\n'
+ '  </div>\n'
+ '</div>\n\n'
+)
+h = h[:_rv_i] + _rv_new + h[_rv_j:]
+report.append('\u6708\u5ea6\u590d\u76d8\u9875\u5df2\u6e05\u7a7a\u4e3a\u7a7a\u6001')
+
+# ── 5e) 清掉浏览器 localStorage 里残留的北斗策略文案 ──
+#     这些不在代码里，是访问时写进用户浏览器的，改代码清不掉，必须在页面上清
+_ls = """<script>
+(function(){
+  try{
+    var BAD=/51tiktok|51\u52a8\u6f2b|91Pron|\u7981\u6f2b\u5929\u5802|\u841d\u8389\u5c9b|51\u54c1\u8336|51\u63a8\u7279|Pornhub\u4e2d\u6587\u7248|TikTok\u6210\u4eba\u7248|\u91d1\u4e88|\u8d75\u5c18|\u674e\u6f2b\u59ae|\u6e29\u590f\u9752|\u9a6c\u594e\u65af/;
+    ['bi_strategy_note','bi_strategy_notes','bi_strategy_overrides'].forEach(function(k){
+      var v=localStorage.getItem(k);
+      if(v && BAD.test(v)) localStorage.removeItem(k);
+    });
+    var ta=document.getElementById('strategyNote');
+    if(ta && BAD.test(ta.value||'')) ta.value='';
+  }catch(e){}
+})();
+</script>
+"""
+h = h.replace('</body>', _ls + '</body>', 1)
+report.append('\u5df2\u52a0 localStorage \u6b8b\u7559\u6e05\u7406\u811a\u672c')
+
 # ── 6) 拆掉运行时补丁引用（不再寄生）────────────────────
 for tag in ('<script src="yipin-patch.js"></script>', "<script src='yipin-patch.js'></script>"):
     if tag in h: h = h.replace(tag, ''); report.append('移除 yipin-patch.js 引用')
@@ -194,8 +234,12 @@ for must in ('</html>', '</body>', 'monthConfigs', 'switchMonth',
     if must not in h: die('注入后缺少关键片段: ' + must)
 for bad in ('悦达', '北斗', '马奎斯'):
     if bad in h: die('注入后仍残留「%s」，请检查替换规则' % bad)
-for warn in ('51tiktok', '禁漫天堂', '萝莉岛', '51品茶'):
-    if warn in h: print('⚠️ 仍含模板示例词「%s」（不拦截，请人工看一眼）' % warn)
+# 残留检查要排除 5e 的清理脚本本身（它的正则里必然含这些词）
+_h_check = h.replace(_ls, '')
+for bad in ('51tiktok', '51动漫', '91Pron', '禁漫天堂', '萝莉岛', '51品茶',
+            '51推特', 'Pornhub中文版', 'TikTok成人版',
+            '金予', '赵尘', '李漫妮', '温夏青'):
+    if bad in _h_check: die('注入后仍残留北斗模板内容「%s」' % bad)
 if len(h) < orig_len * 0.2: die('注入后体积异常（%d → %d）' % (orig_len, len(h)))
 
 io.open(HTML, 'w', encoding='utf-8').write(h)
