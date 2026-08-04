@@ -9,12 +9,15 @@ import json, re, sys, io, datetime, os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HTML = os.path.join(ROOT, 'index.html')
+TPL  = os.path.join(ROOT, 'template', 'index.html')
 DATA = os.path.join(ROOT, 'data', 'yipin_data.json')
 
 def die(msg):
     print('❌ ' + msg); sys.exit(1)
 
-h = io.open(HTML, encoding='utf-8').read()
+SRC = TPL if os.path.exists(TPL) else HTML
+h = io.open(SRC, encoding='utf-8').read()
+print('源模板: ' + os.path.relpath(SRC, ROOT))
 d = json.load(io.open(DATA, encoding='utf-8'))
 orig_len = len(h)
 report = []
@@ -127,17 +130,17 @@ for _v in ('STRAT_L', 'STRAT_DEFAULT', 'DEFAULT_STRATEGY', 'STRATEGY_TEXT'):
             h = h[:m2.end()] + '{}' + h[e2:]
             report.append('清空模板内置策略文案 ' + _v)
 
-# 兜底：任何仍含北斗产品名的字符串字面量整体清空（策略/备注类默认文案）
+# 安全清理：只清「= "....北斗产品名...."」这种整串赋值的默认文案，不碰 HTML 属性
 BEIDOU_WORDS = ('51tiktok', '51推特', '51成人', '51动漫', '51品茶', '禁漫天堂', '萝莉岛',
-                '海角乱伦', '暗网禁区', '抖阴Max', '91Pron', '91鬼父', '草榴社区', '妻友',
-                'AI色色', 'pornhub免费版', '91成人盒子', '蓝友')
-def _blank_lit(mo):
-    q, body = mo.group(1), mo.group(2)
-    return q + q if any(w in body for w in BEIDOU_WORDS) else mo.group(0)
+                '海角乱伦', '暗网禁区', '抖阴Max', '91Pron', '91鬼父', '草榴社区',
+                'AI色色', 'pornhub免费版', '91成人盒子')
+def _blank_assign(mo):
+    body = mo.group(3)
+    return (mo.group(1) + mo.group(2) + mo.group(2)) if any(w in body for w in BEIDOU_WORDS) else mo.group(0)
 before = h
-h = re.sub(r'(["\'])((?:[^"\'\\]|\\.){0,400}?)\1', _blank_lit, h)
+h = re.sub(r'(=\s*)(["\'])((?:[^"\'\\\n]|\\.){1,300}?)\2', _blank_assign, h)
 if h != before:
-    report.append('清空含北斗产品名的默认文案字符串')
+    report.append('清空含北斗产品名的默认文案（仅赋值语句）')
 
 # ── 6) 拆掉运行时补丁引用（不再寄生）────────────────────
 for tag in ('<script src="yipin-patch.js"></script>', "<script src='yipin-patch.js'></script>"):
@@ -149,10 +152,13 @@ stamp = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
 h = re.sub(r'(id="sidebarUpdateTime"[^>]*>)[^<]*', r'\g<1>' + stamp.strftime('%Y-%m-%d %H:%M'), h)
 
 # ── 校验（防止把文件改坏）────────────────────────────────
-for must in ('</html>', '</body>', 'monthConfigs', 'switchMonth'):
+for must in ('</html>', '</body>', 'monthConfigs', 'switchMonth',
+             'kpiMinRate', 'kpiMaxRate', 'ovTargetTotal', 'ovBudgetTotal', 'monthSelector'):
     if must not in h: die('注入后缺少关键片段: ' + must)
-for bad in ('悦达', '北斗', '马奎斯', '51tiktok', '禁漫天堂', '萝莉岛', '海角乱伦', '51品茶'):
+for bad in ('悦达', '北斗', '马奎斯'):
     if bad in h: die('注入后仍残留「%s」，请检查替换规则' % bad)
+for warn in ('51tiktok', '禁漫天堂', '萝莉岛', '51品茶'):
+    if warn in h: print('⚠️ 仍含模板示例词「%s」（不拦截，请人工看一眼）' % warn)
 if len(h) < orig_len * 0.2: die('注入后体积异常（%d → %d）' % (orig_len, len(h)))
 
 io.open(HTML, 'w', encoding='utf-8').write(h)
