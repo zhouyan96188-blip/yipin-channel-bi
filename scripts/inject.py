@@ -232,10 +232,10 @@ h = re.sub(r'(id="sidebarUpdateTime"[^>]*>)[^<]*', r'\g<1>' + stamp.strftime('%Y
 for must in ('</html>', '</body>', 'monthConfigs', 'switchMonth',
              'kpiMinRate', 'kpiMaxRate', 'ovTargetTotal', 'ovBudgetTotal', 'monthSelector'):
     if must not in h: die('注入后缺少关键片段: ' + must)
-for bad in ('悦达', '北斗', '马奎斯'):
-    if bad in h: die('注入后仍残留「%s」，请检查替换规则' % bad)
-# 残留检查要排除 5e 的清理脚本本身（它的正则里必然含这些词）
+# 残留检查一律排除 5e 的清理脚本本身（它的正则里必然含这些词）
 _h_check = h.replace(_ls, '')
+for bad in ('悦达', '北斗', '马奎斯'):
+    if bad in _h_check: die('注入后仍残留「%s」，请检查替换规则' % bad)
 for bad in ('51tiktok', '51动漫', '91Pron', '禁漫天堂', '萝莉岛', '51品茶',
             '51推特', 'Pornhub中文版', 'TikTok成人版',
             '金予', '赵尘', '李漫妮', '温夏青'):
