@@ -204,19 +204,36 @@ report.append('\u6708\u5ea6\u590d\u76d8\u9875\u5df2\u6e05\u7a7a\u4e3a\u7a7a\u600
 #     这些不在代码里，是访问时写进用户浏览器的，改代码清不掉，必须在页面上清
 _ls = """<script>
 (function(){
+  var BAD=/51tiktok|51\u52a8\u6f2b|91Pron|\u7981\u6f2b\u5929\u5802|\u841d\u8389\u5c9b|51\u54c1\u8336|51\u63a8\u7279|Pornhub\u4e2d\u6587\u7248|TikTok\u6210\u4eba\u7248|\u91d1\u4e88|\u8d75\u5c18|\u674e\u6f2b\u59ae|\u6e29\u590f\u9752|\u9a6c\u594e\u65af/;
+  function wipe(){
+    try{
+      ['bi_strategy_note','bi_strategy_notes','bi_strategy_overrides'].forEach(function(k){
+        var v=localStorage.getItem(k);
+        if(v && BAD.test(v)) localStorage.removeItem(k);
+      });
+      var ta=document.getElementById('strategyNote');
+      if(ta && BAD.test(ta.value||'')) ta.value='';
+    }catch(e){}
+  }
+  wipe();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', wipe);
+  else wipe();
+  window.addEventListener('load', wipe);
+  setTimeout(wipe, 600); setTimeout(wipe, 2000);
+  // 兜底：拦住把北斗文案写回去的调用
   try{
-    var BAD=/51tiktok|51\u52a8\u6f2b|91Pron|\u7981\u6f2b\u5929\u5802|\u841d\u8389\u5c9b|51\u54c1\u8336|51\u63a8\u7279|Pornhub\u4e2d\u6587\u7248|TikTok\u6210\u4eba\u7248|\u91d1\u4e88|\u8d75\u5c18|\u674e\u6f2b\u59ae|\u6e29\u590f\u9752|\u9a6c\u594e\u65af/;
-    ['bi_strategy_note','bi_strategy_notes','bi_strategy_overrides'].forEach(function(k){
-      var v=localStorage.getItem(k);
-      if(v && BAD.test(v)) localStorage.removeItem(k);
-    });
-    var ta=document.getElementById('strategyNote');
-    if(ta && BAD.test(ta.value||'')) ta.value='';
+    var _si = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = function(k,v){
+      if(typeof v==='string' && BAD.test(v)) return;
+      return _si(k,v);
+    };
   }catch(e){}
 })();
 </script>
 """
-h = h.replace('</body>', _ls + '</body>', 1)
+_be = h.rfind('</body>')
+if _be < 0: die('找不到 </body>')
+h = h[:_be] + _ls + h[_be:]
 report.append('\u5df2\u52a0 localStorage \u6b8b\u7559\u6e05\u7406\u811a\u672c')
 
 # ── 5f) 清掉 review 页以外的零星模板残留（都不影响显示，但不留人家的字）──
