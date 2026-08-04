@@ -186,7 +186,7 @@ if _rv_i < 0 or _rv_j < 0 or _rv_j <= _rv_i:
     die('page-review 定位失败（i=%d j=%d）' % (_rv_i, _rv_j))
 
 _reviews = {}
-for _m, _cfg in mc.items():
+for _m, _cfg in d.items():   # 从原始 json 读，mc 是白名单构造的不含 review
     if isinstance(_cfg, dict) and _cfg.get('review'):
         _reviews[_m] = _cfg['review']
 if not _reviews:
