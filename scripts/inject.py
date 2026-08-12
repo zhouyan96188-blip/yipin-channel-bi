@@ -302,9 +302,35 @@ _ls = """<script>
 })();
 </script>
 """
+# ── 5e之二) 冷启动月份状态同步 ─────────────────────────────
+#     §3 已把最新月排到下拉第一位（DOM 上就是选中态），但模板自带的 JS
+#     仍把 currentMonth 初始化成它原来的默认月份（旧月）。结果首屏是「混合态」：
+#     侧栏「更新时间」和「每日明细」产品下拉走旧月，概览 KPI 却走新月。
+#     用户手点一下月份下拉就全对 —— 这里就是在加载后替他点这一下。
+#     只跑到 currentMonth 对齐为止，对齐后立即停，不干扰用户后续自己切月。
+_NEWEST = sorted(d.keys(), key=lambda k: int(k.replace('月', '')), reverse=True)[0]
+_sm = ("\n<script>\n/* 冷启动月份同步：把 currentMonth 对齐到下拉选中的最新月 */\n"
+       "(function(){var WANT=" + json.dumps(_NEWEST, ensure_ascii=False) + ";var n=0,done=false;\n"
+       "function cur(){try{return currentMonth;}catch(e){return null;}}\n"
+       "function sync(){\n"
+       "  if(done)return; n++;\n"
+       "  var s=document.getElementById('monthSelector')||document.querySelector('select');\n"
+       "  if(s&&Array.prototype.some.call(s.options,function(o){return o.value===WANT;})){\n"
+       "    if(cur()===WANT){done=true;return;}\n"
+       "    s.value=WANT;\n"
+       "    s.dispatchEvent(new Event('change',{bubbles:true}));\n"
+       "    if(cur()===WANT){done=true;return;}\n"
+       "  }\n"
+       "  if(n<40)setTimeout(sync,150);\n"
+       "}\n"
+       "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',sync);else sync();\n"
+       "window.addEventListener('load',sync);\n"
+       "})();\n</script>\n")
+
 _be = h.rfind('</body>')
 if _be < 0: die('找不到 </body>')
-h = h[:_be] + _rv_js + _ls + h[_be:]
+h = h[:_be] + _rv_js + _ls + _sm + h[_be:]
+report.append('已加冷启动月份同步脚本 → ' + _NEWEST)
 report.append('\u5df2\u52a0 localStorage \u6b8b\u7559\u6e05\u7406\u811a\u672c')
 
 # ── 5f) 清掉 review 页以外的零星模板残留（都不影响显示，但不留人家的字）──
