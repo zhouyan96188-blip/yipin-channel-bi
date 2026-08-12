@@ -346,7 +346,7 @@ tbody td:not(:first-child) { text-align:right; font-family:'JetBrains Mono','SF 
   </div>
   <div class="sidebar-footer">
     <div class="sf-date">更新时间</div>
-    <div class="sf-period" id="sidebarUpdateTime">2026-08-12 12:44</div>
+    <div class="sf-period" id="sidebarUpdateTime">2026-08-12 15:27</div>
   </div>
 </nav>
 
@@ -3063,6 +3063,26 @@ document.addEventListener('click',burst2,true);
       return _si(k,v);
     };
   }catch(e){}
+})();
+</script>
+
+<script>
+/* 冷启动月份同步：把 currentMonth 对齐到下拉选中的最新月 */
+(function(){var WANT="8月";var n=0,done=false;
+function cur(){try{return currentMonth;}catch(e){return null;}}
+function sync(){
+  if(done)return; n++;
+  var s=document.getElementById('monthSelector')||document.querySelector('select');
+  if(s&&Array.prototype.some.call(s.options,function(o){return o.value===WANT;})){
+    if(cur()===WANT){done=true;return;}
+    s.value=WANT;
+    s.dispatchEvent(new Event('change',{bubbles:true}));
+    if(cur()===WANT){done=true;return;}
+  }
+  if(n<40)setTimeout(sync,150);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',sync);else sync();
+window.addEventListener('load',sync);
 })();
 </script>
 </body>
