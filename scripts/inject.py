@@ -333,6 +333,40 @@ h = h[:_be] + _rv_js + _ls + _sm + h[_be:]
 report.append('已加冷启动月份同步脚本 → ' + _NEWEST)
 report.append('\u5df2\u52a0 localStorage \u6b8b\u7559\u6e05\u7406\u811a\u672c')
 
+# ── 5e之三) 人员 KPI 兜底：当月无人员时，最佳/最差 4 格写「—」，不许残留上个月的人名 ──
+#     模板 renderPersonal 里是 `if (ranked.length) { ...写这 4 格... }`：
+#     当月 people 为空（或全员 target=0）时，这 4 格压根不写 → 会留着上个月的人名和完成率，
+#     等于凭空编造。这里不动模板的 renderPersonal / switchMonth，只在页面末尾追加一段
+#     独立兜底脚本 —— 万一它自己出问题，也只影响这 4 格，不牵连别的页面。
+#     时机：change 走冒泡阶段（模板是 <select onchange="switchMonth(...)">，冒泡到 document
+#     时 switchMonth 已经跑完），再加一串 setTimeout 兜住异步渲染，避免「写完 — 又被写回旧值」。
+_PKIDS = ('kpiPersonBest', 'kpiPersonBestName', 'kpiPersonWorst', 'kpiPersonWorstName')
+for _pid in _PKIDS:
+    if ('id="' + _pid + '"') not in h:
+        die('\u4eba\u5458 KPI \u515c\u5e95\uff1a\u6a21\u677f\u91cc\u627e\u4e0d\u5230 id="%s"\uff0c\u6a21\u677f\u7ed3\u6784\u53ef\u80fd\u53d8\u4e86' % _pid)
+_pcount = {}
+for _m, _cfg in d.items():
+    _ppl = ((_cfg.get('personalData') or {}).get('people')) or []
+    _pcount[_m] = sum(1 for _p in _ppl if (_p or {}).get('target', 0) > 0)
+_pk = ("\n<script>\n/* \u4eba\u5458 KPI \u515c\u5e95\uff1a\u5f53\u6708\u65e0\u4eba\u5458 \u2192 \u6700\u4f73/\u6700\u5dee 4 \u683c\u5199\u300c\u2014\u300d\uff0c\u4e0d\u6b8b\u7559\u4e0a\u6708\u4eba\u540d */\n"
+       "(function(){var PC=" + json.dumps(_pcount, ensure_ascii=False, separators=(',', ':')) + ";\n"
+       "var IDS=" + json.dumps(list(_PKIDS)) + ";\n"
+       "function mon(){var s=document.getElementById('monthSelector')||document.querySelector('select');\n"
+       "if(s&&s.value)return s.value;try{return currentMonth;}catch(e){return null;}}\n"
+       "function fixPerson(){var m=mon();if(m==null||!Object.prototype.hasOwnProperty.call(PC,m))return;\n"
+       "if(PC[m]>0)return;/* \u6709\u4eba\u5458\uff1a\u4ea4\u7ed9\u6a21\u677f\u81ea\u5df1\u6e32\u67d3\uff0c\u4e0d\u5e72\u9884 */\n"
+       "IDS.forEach(function(id){var e=document.getElementById(id);\n"
+       "if(e&&e.textContent!=='\\u2014')e.textContent='\\u2014';});}\n"
+       "function burst3(){fixPerson();[0,60,250,600,1200].forEach(function(t){setTimeout(fixPerson,t);});}\n"
+       "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',burst3);else burst3();\n"
+       "window.addEventListener('load',burst3);\n"
+       "document.addEventListener('change',burst3,false);document.addEventListener('click',burst3,false);\n"
+       "})();\n</script>\n")
+_be_pk = h.rfind('</body>')
+if _be_pk < 0: die('\u4eba\u5458 KPI \u515c\u5e95\u811a\u672c\u63d2\u5165\u5931\u8d25\uff1a\u627e\u4e0d\u5230 </body>')
+h = h[:_be_pk] + _pk + h[_be_pk:]
+report.append('\u5df2\u52a0\u4eba\u5458 KPI \u515c\u5e95\u811a\u672c \u2192 ' + json.dumps(_pcount, ensure_ascii=False))
+
 # ── 5f) 清掉 review 页以外的零星模板残留（都不影响显示，但不留人家的字）──
 #     ① 三个 KPI 卡片的静态占位文本：运行时会被真实产品名覆盖，源码里却写死着北斗产品
 _kpi_n = 0
